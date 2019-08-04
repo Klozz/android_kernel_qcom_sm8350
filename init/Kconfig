@@ -1185,13 +1185,11 @@ config SCHED_AUTOGROUP
 
 
 config CPUSETS_ASSIST
-	bool "Cpusets configuration helper"
+	bool "Cpuset configuration helper"
 	depends on CPUSETS
 	depends on ANDROID
 	help
-	  This option enables the configuration of default cpusets
-	  parameters from kernel.
-
+	  This option enables in-kernel overrides for cpuset values.
 	  If unsure, say N.
 
 config SYSFS_DEPRECATED
