@@ -91,11 +91,26 @@ static void __iomem *rpmh_unit_base;
 
 static DEFINE_MUTEX(rpmh_stats_mutex);
 
+#ifdef CONFIG_RPMH_STATS_DBG
+struct msm_rpmh_master_dbg {
+	char *name;
+	uint32_t counts;
+};
+
+static struct msm_rpmh_master_dbg rpmh_masters_dbg[] = {
+	{"ADSP", 0},
+};
+#endif
+
 static ssize_t msm_rpmh_master_stats_print_data(char *prvbuf, ssize_t length,
 				struct msm_rpmh_master_stats *record,
 				const char *name)
 {
 	uint64_t accumulated_duration = record->accumulated_duration;
+
+#ifdef CONFIG_RPMH_STATS_DBG
+	int idx;
+#endif
 	/*
 	 * If a master is in sleep when reading the sleep stats from SMEM
 	 * adjust the accumulated sleep duration to show actual sleep time.
@@ -106,6 +121,19 @@ static ssize_t msm_rpmh_master_stats_print_data(char *prvbuf, ssize_t length,
 		accumulated_duration +=
 				(__arch_counter_get_cntvct()
 				- record->last_entered);
+
+#ifdef CONFIG_RPMH_STATS_DBG
+	if (delta_duration == 0) {
+		for (idx = 0; idx < ARRAY_SIZE(rpmh_masters_dbg); idx++) {
+			if (strncmp(name, rpmh_masters_dbg[idx].name, strlen(name)) == 0) {
+				printk("%s: %s subsystem sleep debug\n", __func__, name);
+				rpmh_masters_dbg[idx].counts++;
+				if (rpmh_masters_dbg[idx].counts > 20)
+					panic("%s: %s subsystem long time can't goto sleep!!!\n", __func__, name);
+			}
+		}
+	}
+#endif
 
 	return scnprintf(prvbuf, length, "%s\n\tVersion:0x%x\n"
 			"\tSleep Count:0x%x\n"
