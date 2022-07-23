@@ -1369,7 +1369,7 @@ config SDX_EXT_IPC
 
 config RPMH_STATS_DBG
 	tristate "Qualcomm Technologies RPMH Stats Debug"
-	default y
+	default n
 	help
 	  This option enables a panic when subsystem can't sleep.
 
