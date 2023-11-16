@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2023 Sultan Alsawaf <sultan@kerneltoast.com>.
+ * Copyright (C) 2023-2024 Sultan Alsawaf <sultan@kerneltoast.com>.
+ * kernel 5.4 adaptation by
+ * Copyright (C) 2025 Carlos "klozz" Jesus <carlosj@klozz.dev>.
  */
 
 /**
@@ -11,7 +13,7 @@
  * CPUs until the heaviest CPU is no longer the heaviest. IRQs are only moved
  * from one source CPU to any number of destination CPUs per balance run.
  * Balancing is skipped if the gap between the most interrupt-heavy CPU and the
- * least interrupt-heavy CPU is below the configured threshold of interrupts.
+ * least-heavy CPU is below the configured threshold of interrupts.
  *
  * The heaviest IRQs are targeted for migration in order to reduce the number of
  * IRQs to migrate. If moving an IRQ would reduce overall balance, then it won't
@@ -170,7 +172,7 @@ static unsigned int scale_intrs(unsigned int intrs, int cpu)
 
 /* Returns true if IRQ balancing should stop */
 static bool find_min_bd(const cpumask_t *mask, unsigned int max_intrs,
-                       struct bal_domain **min_bd)
+			struct bal_domain **min_bd)
 {
 	unsigned int intrs, min_intrs = UINT_MAX;
 	struct bal_domain *bd;
@@ -184,12 +186,20 @@ static bool find_min_bd(const cpumask_t *mask, unsigned int max_intrs,
 		if (intrs > max_intrs)
 			return true;
 
+		/* Don't consider moving IRQs to this CPU if it's excluded */
+		if (cpumask_test_cpu(cpu, &cpu_exclude_mask))
+			continue;
+
 		/* Find the CPU with the lowest relative number of interrupts */
 		if (intrs < min_intrs) {
 			min_intrs = intrs;
 			*min_bd = bd;
 		}
 	}
+
+	/* No CPUs available to move IRQs onto */
+	if (min_intrs == UINT_MAX)
+		return true;
 
 	/* Don't balance if IRQs are already balanced evenly enough */
 	return max_intrs - min_intrs < IRQ_SCALED_THRESH;
@@ -207,7 +217,7 @@ static void balance_irqs(void)
 	rcu_read_lock();
 
 	/* Find the available CPUs for balancing, if there are any */
-	cpumask_andnot(&cpus, cpu_active_mask, &cpu_exclude_mask);
+	cpumask_copy(&cpus, cpu_active_mask); // changed from cpumask_andnot
 	if (unlikely(cpumask_weight(&cpus) <= 1))
 		goto unlock;
 
