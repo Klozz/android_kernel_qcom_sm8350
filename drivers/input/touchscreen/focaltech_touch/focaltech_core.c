@@ -42,6 +42,7 @@
 #include <linux/of_irq.h>
 #if defined(CONFIG_DRM)
 #include <drm/drm_panel.h>
+#include <drm/mi_disp_notifier.h>
 #elif defined(CONFIG_FB)
 #include <linux/notifier.h>
 #include <linux/fb.h>
@@ -2799,11 +2800,9 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
 		INIT_WORK(&ts_data->suspend_work, fts_suspend_work);
 	}
 	ts_data->fb_notif.notifier_call = fb_notifier_callback;
-
-	if (active_panel &&
-		drm_panel_notifier_register(active_panel,
-			&ts_data->fb_notif) < 0)
-		FTS_ERROR("register notifier failed!\n");
+	if (mi_disp_register_client(&ts_data->fb_notif) < 0) {
+        FTS_ERROR("register notifier failed!\n");
+        }
 
 #elif defined(CONFIG_FB)
 	if (ts_data->ts_workqueue) {

@@ -399,7 +399,7 @@ void fts_gesture_recovery(struct fts_ts_data *ts_data)
     }
 }
 
-void fts_fod_recovery()
+void fts_fod_recovery(void)
 {
     FTS_FUNC_ENTER();
     if (fts_data->suspended) {
