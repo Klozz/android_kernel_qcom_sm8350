@@ -292,6 +292,7 @@ static int goodix_spi_remove(struct spi_device *spi)
 static const struct of_device_id spi_matchs[] = {
 	{.compatible = "xiaomi,gt9916r-spi",},
 	{.compatible = "xiaomi,l9-spi",},
+	{.compatible = "xiaomi,m20-spi",},
 	{},
 };
 #endif
