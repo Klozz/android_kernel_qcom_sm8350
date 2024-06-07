@@ -619,7 +619,7 @@ And public attribution of xiaomi platforms
 		//compatible = "xiaomi,gt9916r-spi";
 		compatible = "xiaomi,m20-spi";
 		reg = <0>;
-		spi-max-frequency = <5000000>;
+		spi-max-frequency = <12000000>;
 		interrupt-parent = <&tlmm>;
 		interrupts = <81 0x2802>;
 		goodix,irq-gpio = <&tlmm 81 0x2802>;
