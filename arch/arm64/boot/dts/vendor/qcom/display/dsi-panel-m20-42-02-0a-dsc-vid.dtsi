@@ -14,20 +14,27 @@
 				qcom,mdss-dsi-lane-map = "lane_map_0123";
 				qcom,mdss-dsi-bllp-eof-power-mode;
 				qcom,mdss-dsi-bllp-power-mode;
+				qcom,mdss-dsi-factory-bl-max-level = <0x7ff>;
 				qcom,mdss-dsi-lane-0-state;
 				qcom,mdss-dsi-lane-1-state;
 				qcom,mdss-dsi-lane-2-state;
 				qcom,mdss-dsi-lane-3-state;
 				qcom,mdss-dsi-dma-trigger = "trigger_sw";
 				qcom,mdss-dsi-mdp-trigger = "none";
-				qcom,mdss-dsi-reset-sequence = <1 1>, <0 1>, <1 20>;
+				qcom,mdss-dsi-reset-sequence = <0x1 0x1 0x0 0x1 0x1 0x14>;
 				qcom,mdss-pan-physical-width-dimension = <70>;
 				qcom,mdss-pan-physical-height-dimension = <154>;
 				qcom,mdss-dsi-tx-eot-append;
 				qcom,mdss-dsi-lp11-init;
 				qcom,mdss-dsi-bl-inverted-dbv;
+				qcom,mdss-dsi-bl-max-level = <0xfff>;
+				qcom,mdss-dsi-bl-min-level = <0x3>;
+				qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
 				qcom,bl-update-flag = "delay_until_first_frame";
 				qcom,mdss-dsi-phy-voltage = <0x51>;
+				qcom,panel-supply-entries = <0x3f>;
+				qcom,platform-reset-gpio = <0xffffffff 0x2c 0x0>;
+				qcom,platform-te-gpio = <0xffffffff 0x50 0x0>;
 
 				qcom,mdss-dsi-panel-hdr-enabled;
 				qcom,mdss-dsi-panel-hdr-color-primaries = <14500 15500 32000 17000 15500 30000 8000 3000>;
@@ -42,6 +49,7 @@
 						qcom,mdss-dsi-panel-framerate = <120>;
 						qcom,mdss-dsi-panel-width = <1080>;
 						qcom,mdss-dsi-panel-height = <2400>;
+						qcom,mdss-dsi-panel-phy-timings = [00 1d 07 07 17 16 07 07 08 02 04 00 19 0c];
 						qcom,mdss-dsi-h-front-porch = <48>;
 						qcom,mdss-dsi-h-back-porch = <64>;
 						qcom,mdss-dsi-h-pulse-width = <4>;
@@ -64,10 +72,10 @@
 						qcom,mdss-dsi-nolp-command-state = "dsi_hs_mode";
 						qcom,compression-mode = "dsc";
 						qcom,mdss-dsc-version = <0x12>;
-						qcom,mdss-dsc-scr-version = <0x00>;
-						qcom,mdss-dsc-slice-height = <12>;
-						qcom,mdss-dsc-slice-width = <540>;
-						qcom,mdss-dsc-slice-per-pkt = <2>;
+						qcom,mdss-dsc-scr-version = <0x0>;
+						qcom,mdss-dsc-slice-height = <0xc>;
+						qcom,mdss-dsc-slice-width = <0x21c>;
+						qcom,mdss-dsc-slice-per-pkt = <0x2>;
 						qcom,mdss-dsc-bit-per-component = <10>;
 						qcom,mdss-dsc-bit-per-pixel = <8>;
 						qcom,mdss-dsc-block-prediction-enable;
@@ -78,7 +86,8 @@
 
 &dsi_m20_42_0d_0b_dsc_vid {
 
-				mi,panel-id = <0x004d3230 0x00420d00>;
+				//mi,panel-id = <0x004d3230 0x00420d00>;
+				mi,panel-id = "", "M20", "B\r";
 				mi,hbm-51-ctl-flag;
 				mi,bl-51ctl-32bit-flag;
 				mi,aod-bl-51ctl-flag;
@@ -99,7 +108,7 @@
 
 				qcom,mdss-dsi-display-timings {
 					timing@0 {
-						mi,mdss-dsc-panel-id = <0x004d3230 0x00360200>;
+						mi,mdss-dsc-panel-id = <0x4d3230 0x360200>;
 						mi,mdss-dsi-hbm-on-command = [39 01 00 00 00 00 03 51 0f ff];
 						mi,mdss-dsi-hbm-on-command-state = "dsi_hs_mode";
 						mi,mdss-dsi-hbm-off-command = [39 01 00 00 00 00 03 51 07 ff];
