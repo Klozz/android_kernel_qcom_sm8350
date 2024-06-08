@@ -161,17 +161,17 @@
 			mi,mdss-dsi-fps-120-gamma-command = [
 				15 01 00 00 00 00 02 6c 02
 			];
-			mi,mdss-dsi-fps-120-gamma-command-state = "dsi_lp_mode";
+			mi,mdss-dsi-fps-120-gamma-command-state = "dsi_hs_mode";
 
 			mi,mdss-dsi-fps-90-gamma-command = [
 				15 01 00 00 00 00 02 6c 01
 			];
-			mi,mdss-dsi-fps-90-gamma-command-state = "dsi_lp_mode";
+			mi,mdss-dsi-fps-90-gamma-command-state = "dsi_hs_mode";
 
 			mi,mdss-dsi-fps-60-gamma-command = [
 				15 01 00 00 00 00 02 6c 00
 			];
-			mi,mdss-dsi-fps-60-gamma-command-state = "dsi_lp_mode";
+			mi,mdss-dsi-fps-60-gamma-command-state = "dsi_hs_mode";
 		};
 
 	};
