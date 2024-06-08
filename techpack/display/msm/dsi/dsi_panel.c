@@ -390,7 +390,8 @@ static int dsi_panel_power_off(struct dsi_panel *panel)
 	if (gpio_is_valid(panel->reset_config.disp_en_gpio))
 		gpio_set_value(panel->reset_config.disp_en_gpio, 0);
 
-	if (panel->mi_panel_id == 0x4D323000360200) {
+	if (panel->mi_panel_id == 0x4D323000360200 
+     || panel->mi_panel_id == 0x4D323000420D00) {
 	  mdelay(5);
 	}
 
@@ -5161,7 +5162,8 @@ int dsi_panel_post_enable(struct dsi_panel *panel)
 error:
 	mutex_unlock(&panel->panel_lock);
 
-	if (panel->mi_panel_id == 0x4D323000360200) {
+	if (panel->mi_panel_id == 0x4D323000360200 
+     || panel->mi_panel_id == 0x4D323000420D00) {
 		dsi_panel_gamma_switch(panel);
 	}
 
