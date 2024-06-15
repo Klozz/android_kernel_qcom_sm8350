@@ -6905,7 +6905,6 @@ int voc_set_device_config(uint32_t session_id, uint8_t path_dir,
 			  struct media_format_info *finfo)
 {
 	struct voice_data *v = voice_get_session(session_id);
-	int ret = 0;
 
 	if (v == NULL) {
 		pr_err("%s: Invalid session_id 0x%x\n", __func__, session_id);
@@ -6937,12 +6936,12 @@ int voc_set_device_config(uint32_t session_id, uint8_t path_dir,
 		break;
 	default:
 		pr_err("%s: Invalid path_dir %d\n", __func__, path_dir);
-		ret = -EINVAL;
+		return -EINVAL;
 	}
 
 	mutex_unlock(&v->lock);
 
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL(voc_set_device_config);
 
