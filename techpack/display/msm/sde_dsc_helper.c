@@ -332,7 +332,7 @@ int sde_dsc_populate_dsc_config(struct drm_dsc_config *dsc, int scr_ver) {
 		dsc->rc_buf_thresh[i] = sde_dsc_rc_buf_thresh[i];
 
 	for (i = 0; i < DSC_NUM_BUF_RANGES; i++) {
-		if (((dsc->dsc_panel_id >> 8) == 0x4D3230003602)) {
+		if (((dsc->dsc_panel_id >> 8) == 0x4D3230003602) || ((dsc->dsc_panel_id >> 8) == 0x4D323000420D)) {
 			dsc->rc_range_params[i].range_min_qp =
 				sde_dsc_rc_range_min_qp_nt37703[ratio_idx][i];
 		} else {
@@ -347,7 +347,7 @@ int sde_dsc_populate_dsc_config(struct drm_dsc_config *dsc, int scr_ver) {
 			dsc->rc_range_params[i].range_max_qp =
 				sde_dsc_rc_range_max_qp_nt[ratio_idx][i];
 
-		} else if (((dsc->dsc_panel_id >> 8) == 0x4D3230003602)) {
+		} else if (((dsc->dsc_panel_id >> 8) == 0x4D3230003602) || ((dsc->dsc_panel_id >> 8) == 0x4D323000420D)) {
 			dsc->rc_range_params[i].range_max_qp =
 				sde_dsc_rc_range_max_qp_nt37703[ratio_idx][i];
 		} else {
@@ -355,7 +355,7 @@ int sde_dsc_populate_dsc_config(struct drm_dsc_config *dsc, int scr_ver) {
 				sde_dsc_rc_range_max_qp[ratio_idx][i];
 		}
 
-		if (((dsc->dsc_panel_id >> 8) == 0x4D3230003602)) {
+		if (((dsc->dsc_panel_id >> 8) == 0x4D3230003602) || ((dsc->dsc_panel_id >> 8) == 0x4D323000420D)) {
 			dsc->rc_range_params[i].range_bpg_offset =
 				sde_dsc_rc_range_bpg_nt37703[ratio_idx][i];
 		} else {
@@ -637,7 +637,7 @@ int sde_dsc_create_pps_buf_cmd(struct msm_display_dsc_info *dsc_info,
 	}
 
 	if (dsc->dsc_version_minor == 0x2) {
-		if (((dsc->dsc_panel_id >> 8) == 0x4D3230003602)) {
+		if (((dsc->dsc_panel_id >> 8) == 0x4D3230003602) || ((dsc->dsc_panel_id >> 8) == 0x4D323000420D)) {
 			data = 0;
 		}
 		if (dsc->native_422)
