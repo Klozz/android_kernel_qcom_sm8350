@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -167,6 +167,11 @@ static int dp_parser_misc(struct dp_parser *parser)
 	if (rc)
 		parser->max_lclk_khz = DP_MAX_LINK_CLK_KHZ;
 
+	rc = of_property_read_u32(of_node,
+		"qcom,max-horizontal-width", &parser->max_hor_width);
+	if (rc)
+		parser->max_hor_width = 0;
+
 	for (i = 0; i < MAX_DP_MST_STREAMS; i++) {
 		of_property_read_u32_index(of_node,
 				"qcom,pixel-base-off", i,
@@ -174,13 +179,19 @@ static int dp_parser_misc(struct dp_parser *parser)
 	}
 
 	parser->display_type = of_get_property(of_node, "qcom,display-type", NULL);
-	if (!parser->display_type)
-		parser->display_type = "unknown";
+	if (!parser->display_type) {
+		if (parser->is_edp)
+			parser->display_type = "primary";
+		else
+			parser->display_type = "secondary";
+	}
 
 	parser->panel_notifier_support = of_property_read_bool(of_node,
 			"qcom,panel-notifier-support");
 	DP_DEBUG("panel-notifier-support = %d\n", parser->panel_notifier_support);
 
+	parser->ext_hpd_en = of_property_read_bool(of_node,
+			"qcom,dp-ext-hpd");
 	return 0;
 }
 
@@ -254,6 +265,49 @@ static int dp_parser_pinctrl(struct dp_parser *parser)
 	}
 error:
 	return rc;
+}
+
+static void dp_parser_bl_config(struct dp_parser *parser)
+{
+	int rc = 0;
+	u32 val = 0;
+	struct device_node *of_node = parser->pdev->dev.of_node;
+
+	rc = of_property_read_u32(of_node, "qcom,edp-bl-min-level", &val);
+	if (rc) {
+		DP_DEBUG("bl-min-level unspecified, defaulting to zero\n");
+		parser->bl_min_level = 0;
+	} else {
+		parser->bl_min_level = val;
+	}
+
+	rc = of_property_read_u32(of_node, "qcom,edp-bl-max-level", &val);
+	if (rc) {
+		DP_DEBUG("bl-max-level unspecified, defaulting to 4096\n");
+		parser->bl_max_level = 4096;
+	} else {
+		parser->bl_max_level = val;
+	}
+
+	rc = of_property_read_u32(of_node, "qcom,edp-brightness-max-level",
+				&val);
+	if (rc) {
+		DP_DEBUG("brigheness-max-level unspecified, defaulting to 255\n");
+		parser->brightness_max_level = 255;
+	} else {
+		parser->brightness_max_level = val;
+	}
+
+	rc = of_property_read_u32(of_node, "qcom,bl-pmic-pwm-period-usecs",
+				&val);
+	if (rc) {
+		DP_DEBUG("bl-pmic-pwm-period-usecs unspecified, default 100\n");
+		parser->pwm_period_usecs = 100;
+	} else {
+		parser->pwm_period_usecs = val;
+	}
+	parser->no_backlight_support = of_property_read_bool(of_node,
+			"qcom,no-backlight-support");
 }
 
 static int dp_parser_gpio(struct dp_parser *parser)
