@@ -66,10 +66,10 @@ static atomic_t market_download_limit = ATOMIC_INIT(0);
 static atomic_t flash_state = ATOMIC_INIT(0);
 static atomic_t wifi_limit = ATOMIC_INIT(0);
 static atomic_t poor_modem_limit = ATOMIC_INIT(0);
-static char boost_buf[128];
+static char boost_buf[4096];
 const char *board_sensor;
-static char board_sensor_temp[128];
-static char board_sensor_second_temp[128];
+static char board_sensor_temp[4096];
+static char board_sensor_second_temp[4096];
 #endif
 
 /*
