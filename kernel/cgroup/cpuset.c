@@ -210,8 +210,7 @@ static inline bool task_is_booster(struct task_struct *tsk)
 	       !strcmp(comm, "perf@2.0-servic") ||
 	       !strcmp(comm, "perf@2.1-servic") ||
 	       !strcmp(comm, "perf@2.2-servic") ||
-	       !strcmp(comm, "power@2.0-servic") ||
-	       !strcmp(comm, "init.qcom.post_");
+	       !strcmp(comm, "power@2.0-servic");
 }
 
 static inline struct cpuset *css_cs(struct cgroup_subsys_state *css)
