@@ -383,9 +383,6 @@ static int dsi_panel_power_off(struct dsi_panel *panel)
 {
 	int rc = 0;
 
-	if (gpio_is_valid(panel->reset_config.disp_en_gpio))
-		gpio_set_value(panel->reset_config.disp_en_gpio, 0);
-
 	if (panel->is_twm_en || panel->skip_panel_off) {
 		DSI_DEBUG("TWM Enabled, skip panel power off\n");
 		return rc;
@@ -395,6 +392,9 @@ static int dsi_panel_power_off(struct dsi_panel *panel)
 	     || panel->mi_panel_id == 0x4D323000420D00) {
 	  mdelay(5);
 	}
+
+	if (gpio_is_valid(panel->reset_config.disp_en_gpio))
+		gpio_set_value(panel->reset_config.disp_en_gpio, 0);
 
 	if (gpio_is_valid(panel->reset_config.reset_gpio) &&
 					!panel->reset_gpio_always_on)
@@ -551,7 +551,6 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 	u32 bl_lvl)
 {
 	int rc = 0;
-	unsigned int bl_tmp = 0;
 	unsigned long mode_flags = 0;
 	struct mipi_dsi_device *dsi = NULL;
 
@@ -565,15 +564,6 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 		mode_flags = dsi->mode_flags;
 		dsi->mode_flags |= MIPI_DSI_MODE_LPM;
 	}
-	
-	if (panel->mi_panel_id == 0x4B394200420200 || panel->mi_panel_id == 0x4B394500420200 || panel->mi_panel_id == 0x4B394500350200) {
-		if (bl_lvl >= 322 && bl_lvl <= 326) {
-			bl_lvl = 321;
-		}
-	}
-
-	bl_tmp = bl_lvl;
-
 
 	if (panel->bl_config.bl_inverted_dbv)
 		bl_lvl = (((bl_lvl & 0xff) << 8) | (bl_lvl >> 8));
@@ -3653,10 +3643,6 @@ static int dsi_panel_parse_esd_config(struct dsi_panel *panel)
 
 	esd_config = &panel->esd_config;
 	esd_config->status_mode = ESD_MODE_MAX;
-
-	esd_config->esd_aod_enabled = utils->read_bool(utils->data,
-		"qcom,esd-aod-check-enabled");
-
 	esd_config->esd_enabled = utils->read_bool(utils->data,
 		"qcom,esd-check-enabled");
 

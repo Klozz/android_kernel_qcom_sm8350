@@ -1049,7 +1049,7 @@ void sde_connector_helper_bridge_disable(struct drm_connector *connector)
 void sde_connector_helper_bridge_enable(struct drm_connector *connector)
 {
 	struct sde_connector *c_conn = NULL;
-	struct dsi_display *display = NULL;
+	struct dsi_display *display;
 	struct sde_kms *sde_kms;
 
 	sde_kms = _sde_connector_get_kms(connector);
@@ -3050,7 +3050,6 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 	struct msm_drm_private *priv;
 	struct sde_kms *sde_kms;
 	struct sde_connector *c_conn = NULL;
-	struct dsi_display *dsi_display;
 	struct msm_display_info display_info;
 	int rc;
 
@@ -3092,7 +3091,6 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 	c_conn->lp_mode = 0;
 	c_conn->last_panel_power_mode = SDE_MODE_DPMS_ON;
 	c_conn->twm_en = false;
-	c_conn->max_esd_check_power_mode = SDE_MODE_DPMS_ON;
 
 	sde_kms = to_sde_kms(priv->kms);
 	if (sde_kms->vbif[VBIF_NRT]) {
@@ -3180,13 +3178,6 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 			sde_connector_handle_panel_id, c_conn);
 		if (rc)
 			SDE_ERROR("register panel id event err %d\n", rc);
-	}
-
-	dsi_display = (struct dsi_display *)(display);
-	if (connector_type == DRM_MODE_CONNECTOR_DSI &&
-			dsi_display && dsi_display->panel &&
-			dsi_display->panel->esd_config.esd_aod_enabled) {
-		c_conn->max_esd_check_power_mode = SDE_MODE_DPMS_LP2;
 	}
 
 	rc = msm_property_install_get_status(&c_conn->property_info);
