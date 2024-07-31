@@ -235,8 +235,12 @@ static void dsi_phy_hw_cphy_enable(struct dsi_phy_hw *phy,
 	} else if (phy->version == DSI_PHY_VERSION_4_1) {
 		glbl_rescode_top_ctrl = 0x00;
 		glbl_rescode_bot_ctrl = 0x3C;
-		glbl_str_swi_cal_sel_ctrl = 0x00;
-		glbl_hstx_str_ctrl_0 = 0x88;
+        if (cfg->clk_strength) {
+                glbl_str_swi_cal_sel_ctrl = 0x1;
+                glbl_hstx_str_ctrl_0 = cfg->clk_strength;
+        }
+        else
+                glbl_hstx_str_ctrl_0 = 0x88;
 	} else {
 		glbl_str_swi_cal_sel_ctrl = 0x03;
 		glbl_hstx_str_ctrl_0 = 0x66;
