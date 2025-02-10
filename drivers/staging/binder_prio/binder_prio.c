@@ -152,14 +152,14 @@ static void extend_surfacefinger_binder_set_priority_handler(void *data, struct 
 static void extend_surfacefinger_binder_trans_handler_54(struct binder_proc *target_proc,
     struct binder_proc *proc, struct binder_thread *thread, struct binder_transaction_data *tr) {
 
-    struct sched_param params; // Declare params here
-    int ret; // Declare ret here
+    struct sched_param params;
+    int ret;
 
     if (target_proc && target_proc->tsk && strncmp(target_proc->tsk->comm, "surfaceflinger",
         strlen("surfaceflinger")) == 0) {
         // Try to set surfaceflinger priority directly (coarse-grained approach)
 
-        params.sched_priority = 98; // Example priority
+        params.sched_priority = 98; // priority 98 is good max is 99
 
         ret = sched_setscheduler_nocheck(target_proc->tsk, SCHED_FIFO | SCHED_RESET_ON_FORK, &params);
         if(ret){
