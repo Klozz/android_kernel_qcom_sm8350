@@ -8,6 +8,9 @@
 #include <../../android/binder_internal.h>
 #include <../../../kernel/sched/sched.h>
 #include <linux/string.h>
+#include <linux/kobject.h>  // For sysfs access
+#include <linux/fs.h>      // For file operations
+#include <linux/slab.h>    // For kmalloc/kfree
 
 #ifdef CONFIG_BINDER_PRIO_DEBUG
 #include <linux/module.h>
@@ -17,7 +20,7 @@ module_param(debug, uint, 0644);
 #endif
 
 static bool __read_mostly is_miui_rom = false;
-static const char *miui_framework = "/system/framework/MiuiBooster.jar";
+
 
 static const char *task_name[] = {
 	"droid.launcher3",  // com.android.launcher3
@@ -31,6 +34,50 @@ static const char *task_name_miui[] = {
 	".globallauncher",  // com.mi.android.globallauncher
 	"rsonalassistant",  // com.miui.personalassistant
 };
+
+// Function to read a system property from sysfs
+static char* get_system_property(const char *prop_name) {
+	char *prop_value = NULL;
+	struct kobject *kobj;
+	struct file *filp;
+	char sysfs_path[256];
+	loff_t pos = 0;
+	int ret;
+
+	snprintf(sysfs_path, sizeof(sysfs_path), "/sys/class/android_system/properties/%s", prop_name);
+
+	kobj = kobj_lookup(NULL, "android_system"); //Look up android_system class
+	if (!kobj) {
+		printk(KERN_ERR "binder_prio: Failed to find android_system class\n");
+		return NULL;
+	}
+	kobject_put(kobj); // release kobj
+
+	filp = filp_open(sysfs_path, O_RDONLY, 0);
+	if (IS_ERR(filp)) {
+		printk(KERN_ERR "binder_prio: Failed to open sysfs file: %s\n", sysfs_path);
+		return NULL;
+	}
+
+	prop_value = kmalloc(128, GFP_KERNEL); // Allocate some memory. Adjust as needed.
+	if (!prop_value) {
+		printk(KERN_ERR "binder_prio: Failed to allocate memory\n");
+		filp_close(filp, NULL);
+		return NULL;
+	}
+
+	ret = kernel_read(filp, prop_value, 127, &pos); // Read up to 127 bytes
+	if (ret < 0) {
+		printk(KERN_ERR "binder_prio: Failed to read sysfs file\n");
+		kfree(prop_value);
+		filp_close(filp, NULL);
+		return NULL;
+	}
+	prop_value[ret] = '\0'; // Null-terminate the string
+
+	filp_close(filp, NULL);
+	return prop_value;
+}
 
 static int to_userspace_prio(int policy, int kernel_priority) {
 	if (fair_policy(policy))
@@ -135,18 +182,21 @@ static void extend_skip_binder_thread_priority_from_rt_to_normal_handler(void *d
 
 int __init binder_prio_init(void)
 {
-    struct path path;
+    pr_info("binder_prio: module init!");
+
+    char *miui_version;
 
     pr_info("binder_prio: module init!");
 
-    if (kern_path(miui_framework, LOOKUP_FOLLOW, &path) == 0) {
-        pr_info("binder_prio: Miui/HyperOS rom detected!\n");
+    miui_version = get_system_property("ro.miui.ui.version.name");
+    if (miui_version) {
+        pr_info("binder_prio: MIUI/HyperOS ROM detected! Version: %s\n", miui_version);
         is_miui_rom = true;
+        kfree(miui_version); // Important: Free the allocated memory
     } else {
-        pr_info("binder_prio: AOSP rom detected!\n");
+        pr_info("binder_prio: AOSP ROM detected!\n");
         is_miui_rom = false;
     }
-    path_put(&path);
 
     register_trace_android_vh_binder_set_priority(extend_surfacefinger_binder_set_priority_handler, NULL);
     register_trace_android_vh_binder_trans(extend_surfacefinger_binder_trans_handler, NULL);

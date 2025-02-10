@@ -1,6 +1,6 @@
 config BINDER_PRIO
 	tristate "Xiaomi binder prio"
-	default m
+	default y
 
 if BINDER_PRIO
 
