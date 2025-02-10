@@ -1,5 +1,7 @@
+#include <linux/version.h>
 #include <linux/swap.h>
-#include <linux/module.h>
+#include <linux/sched.h>
+#include <linux/kthread.h> // If needed for other parts of your code
 #include <trace/hooks/binder.h>
 #include <uapi/linux/android/binder.h>
 #include <uapi/linux/sched/types.h>
@@ -11,6 +13,8 @@
 #include <linux/kobject.h>  // For sysfs access
 #include <linux/fs.h>      // For file operations
 #include <linux/slab.h>    // For kmalloc/kfree
+#include <linux/kallsyms.h> // For property_get
+#include <linux/module.h> // For MODULE_NAME
 
 #ifdef CONFIG_BINDER_PRIO_DEBUG
 #include <linux/module.h>
@@ -20,7 +24,10 @@ module_param(debug, uint, 0644);
 #endif
 
 static bool __read_mostly is_miui_rom = false;
+static const char *miui_framework = "/system/framework/MiuiBooster.jar";
 
+#define KERNEL_VERSION_5_4_0 KERNEL_VERSION(5, 4, 0)
+#define KERNEL_VERSION_5_10_0 KERNEL_VERSION(5, 10, 0)
 
 static const char *task_name[] = {
 	"droid.launcher3",  // com.android.launcher3
@@ -35,56 +42,24 @@ static const char *task_name_miui[] = {
 	"rsonalassistant",  // com.miui.personalassistant
 };
 
-// Function to read a system property from sysfs
-static char* get_system_property(const char *prop_name) {
-	char *prop_value = NULL;
-	struct kobject *kobj;
-	struct file *filp;
-	char sysfs_path[256];
-	loff_t pos = 0;
-	int ret;
-
-	snprintf(sysfs_path, sizeof(sysfs_path), "/sys/class/android_system/properties/%s", prop_name);
-
-	kobj = kobj_lookup(NULL, "android_system"); //Look up android_system class
-	if (!kobj) {
-		printk(KERN_ERR "binder_prio: Failed to find android_system class\n");
-		return NULL;
-	}
-	kobject_put(kobj); // release kobj
-
-	filp = filp_open(sysfs_path, O_RDONLY, 0);
-	if (IS_ERR(filp)) {
-		printk(KERN_ERR "binder_prio: Failed to open sysfs file: %s\n", sysfs_path);
-		return NULL;
-	}
-
-	prop_value = kmalloc(128, GFP_KERNEL); // Allocate some memory. Adjust as needed.
-	if (!prop_value) {
-		printk(KERN_ERR "binder_prio: Failed to allocate memory\n");
-		filp_close(filp, NULL);
-		return NULL;
-	}
-
-	ret = kernel_read(filp, prop_value, 127, &pos); // Read up to 127 bytes
-	if (ret < 0) {
-		printk(KERN_ERR "binder_prio: Failed to read sysfs file\n");
-		kfree(prop_value);
-		filp_close(filp, NULL);
-		return NULL;
-	}
-	prop_value[ret] = '\0'; // Null-terminate the string
-
-	filp_close(filp, NULL);
-	return prop_value;
-}
-
 static int to_userspace_prio(int policy, int kernel_priority) {
 	if (fair_policy(policy))
 		return PRIO_TO_NICE(kernel_priority);
 	else
 		return MAX_USER_RT_PRIO - 1 - kernel_priority;
 }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION_5_4_0 && LINUX_VERSION_CODE < KERNEL_VERSION_5_10_0
+static void set_binder_task_priority(struct task_struct *task, int policy, int priority) {
+	struct sched_param param;
+	param.sched_priority = to_userspace_prio(policy, priority);
+
+	int ret = sched_setscheduler_nocheck(task, policy | SCHED_RESET_ON_FORK, &param);
+	if (ret < 0) {
+		printk(KERN_ERR "binder_prio: Failed to set priority for task %s (%d): %d\n", task->comm, task->pid, ret);
+	}
+}
+#endif
 
 static bool set_binder_rt_task(struct binder_transaction *t) {
 	int i;
@@ -143,7 +118,9 @@ yes_and_exit:
 }
 
 static void extend_surfacefinger_binder_set_priority_handler(void *data, struct binder_transaction *t, struct task_struct *task) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION_5_10_0
 	struct sched_param params;
+#endif
 	struct binder_priority desired;
 	unsigned int policy;
 	struct binder_node *target_node = t->buffer->target_node;
@@ -151,16 +128,56 @@ static void extend_surfacefinger_binder_set_priority_handler(void *data, struct 
 	desired.prio = target_node->min_priority;
 	desired.sched_policy = target_node->sched_policy;
 	policy = desired.sched_policy;
+
 	if (set_binder_rt_task(t)) {
 		desired.sched_policy = SCHED_FIFO;
 		desired.prio = 98;
 		policy = desired.sched_policy;
 	}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION_5_4_0 && LINUX_VERSION_CODE < KERNEL_VERSION_5_10_0
+    if (rt_policy(policy) && task->policy != policy) {
+        set_binder_task_priority(task, policy, desired.prio);
+    }
+#else
 	if (rt_policy(policy) && task->policy != policy) {
 		params.sched_priority = to_userspace_prio(policy, desired.prio);
 		sched_setscheduler_nocheck(task, policy | SCHED_RESET_ON_FORK, &params);
 	}
+#endif
 }
+
+// Placeholder functions for 5.4 (doing the best we can without tracepoints)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION_5_4_0 && LINUX_VERSION_CODE < KERNEL_VERSION_5_10_0
+static void extend_surfacefinger_binder_trans_handler_54(struct binder_proc *target_proc,
+    struct binder_proc *proc, struct binder_thread *thread, struct binder_transaction_data *tr) {
+
+    struct sched_param params; // Declare params here
+    int ret; // Declare ret here
+
+    if (target_proc && target_proc->tsk && strncmp(target_proc->tsk->comm, "surfaceflinger",
+        strlen("surfaceflinger")) == 0) {
+        // Try to set surfaceflinger priority directly (coarse-grained approach)
+
+        params.sched_priority = 98; // Example priority
+
+        ret = sched_setscheduler_nocheck(target_proc->tsk, SCHED_FIFO | SCHED_RESET_ON_FORK, &params);
+        if(ret){
+            printk(KERN_ERR "binder_prio: Failed to set surfaceflinger priority %d\n", ret); // Include MODULE_NAME here too
+        }
+    }
+}
+
+ /*this code should be removed but we need to test? */
+static void extend_skip_binder_thread_priority_from_rt_to_normal_handler_54(struct task_struct *task, bool *skip) {
+    if (task && rt_policy(task->policy)) {
+        // Since we can't intercept the priority boost, we'll try to prevent it
+        // by keeping the task's priority high.  This is a very indirect approach.
+        *skip = true; // Try to prevent any further priority changes
+
+    }
+}
+#endif //End of version check
 
 static void extend_surfacefinger_binder_trans_handler(void *data, struct binder_proc *target_proc,
     struct binder_proc *proc,struct binder_thread *thread, struct binder_transaction_data *tr) {
@@ -182,35 +199,37 @@ static void extend_skip_binder_thread_priority_from_rt_to_normal_handler(void *d
 
 int __init binder_prio_init(void)
 {
-    pr_info("binder_prio: module init!");
+	struct path path;
 
-    char *miui_version;
+	pr_info("binder_prio: module init!");
 
-    pr_info("binder_prio: module init!");
+	if (kern_path(miui_framework, LOOKUP_FOLLOW, &path) == 0) {
+		pr_info("binder_prio: Miui/HyperOS rom detected!\n");
+		is_miui_rom = true;
+	} else {
+		pr_info("binder_prio: AOSP rom detected!\n");
+		is_miui_rom = false;
+	}
+	path_put(&path);
 
-    miui_version = get_system_property("ro.miui.ui.version.name");
-    if (miui_version) {
-        pr_info("binder_prio: MIUI/HyperOS ROM detected! Version: %s\n", miui_version);
-        is_miui_rom = true;
-        kfree(miui_version); // Important: Free the allocated memory
-    } else {
-        pr_info("binder_prio: AOSP ROM detected!\n");
-        is_miui_rom = false;
-    }
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION_5_10_0
     register_trace_android_vh_binder_set_priority(extend_surfacefinger_binder_set_priority_handler, NULL);
     register_trace_android_vh_binder_trans(extend_surfacefinger_binder_trans_handler, NULL);
     register_trace_android_vh_binder_priority_skip(extend_skip_binder_thread_priority_from_rt_to_normal_handler, NULL);
-
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION_5_4_0 && LINUX_VERSION_CODE < KERNEL_VERSION_5_10_0
+    printk(KERN_INFO "binder_prio: Running on kernel 5.4.x - Using task priority manipulation -  Limited functionality.\n");
+    // On 5.4, we use the _54 functions:
+#endif
     return 0;
 }
 
 void __exit binder_prio_exit(void)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION_5_10_0
     unregister_trace_android_vh_binder_set_priority(extend_surfacefinger_binder_set_priority_handler, NULL);
     unregister_trace_android_vh_binder_trans(extend_surfacefinger_binder_trans_handler, NULL);
     unregister_trace_android_vh_binder_priority_skip(extend_skip_binder_thread_priority_from_rt_to_normal_handler, NULL);
-
+#endif
     pr_info("binder_prio: module exit!");
 }
 
