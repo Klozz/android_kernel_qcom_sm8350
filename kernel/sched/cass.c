@@ -24,6 +24,14 @@
  * relative utilization, all CPUs are kept at their lowest P-state necessary to
  * satisfy the overall load at any given moment.
  */
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Adapted CASS Scheduler for Linux Kernel 5.4
+ * Original author: Sultan Alsawaf <sultan@kerneltoast.com>
+ * Ported by carlos 'klozz' jesus <carlosj@klozz.dev> for 5.4 compatibility
+ */
+
+#include "cass.h"
 
 struct cass_cpu_cand {
 	int cpu;
@@ -31,6 +39,20 @@ struct cass_cpu_cand {
 	unsigned long cap;
 	unsigned long util;
 };
+
+/* Approximate task util (since task_util() doesn't exist in 5.4) */
+static inline unsigned long task_util(struct task_struct *p)
+{
+	return READ_ONCE(p->se.avg.util_avg);
+}
+
+/* Dummy uclamp for compatibility */
+#define UCLAMP_DEFAULT 1024
+
+static inline unsigned long uclamp_eff_value(struct task_struct *p, int clamp_id)
+{
+	return UCLAMP_DEFAULT;
+}
 
 static __always_inline
 unsigned long cass_cpu_util(int cpu, bool sync)
@@ -40,11 +62,7 @@ unsigned long cass_cpu_util(int cpu, bool sync)
 
 	/* Deduct @current's util from this CPU if this is a sync wake */
 	if (sync && cpu == smp_processor_id())
-		lsub_positive(&util, task_util(current));
-
-	if (sched_feat(UTIL_EST))
-		util = max_t(unsigned long, util,
-			     READ_ONCE(cfs_rq->avg.util_est.enqueued));
+		util = (util > task_util(current)) ? util - task_util(current) : 0;
 
 	return util;
 }
@@ -100,29 +118,24 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync)
 	unsigned long p_util;
 	int cidx = 0, cpu;
 
-	/* Get the utilization for this task */
-	p_util = clamp(task_util_est(p),
-		       uclamp_eff_value(p, UCLAMP_MIN),
-		       uclamp_eff_value(p, UCLAMP_MAX));
+	/* Get the task's estimated utilization, but clamp it between
+	* the allowed minimum and maximum utilization values
+	* defined by uclamp policies.*/
+	p_util = clamp(task_util(p),
+		       uclamp_eff_value(p, 0), // UCLAMP_MIN
+		       uclamp_eff_value(p, 1)); // UCLAMP_MAX
 
-	/*
-	 * Find the best CPU to wake @p on. Although idle_get_state() requires
-	 * an RCU read lock, an RCU read lock isn't needed because we're not
-	 * preemptible and RCU-sched is unified with normal RCU. Therefore,
-	 * non-preemptible contexts are implicitly RCU-safe.
-	 */
-	for_each_cpu_and(cpu, p->cpus_ptr, cpu_active_mask) {
-		/* Use the free candidate slot */
+	for_each_cpu_and(cpu, &p->cpus_allowed, cpu_active_mask) {
 		curr = &cands[cidx];
 		curr->cpu = cpu;
 
 		/*
-		 * Check if this CPU is idle or only has SCHED_IDLE tasks. For
-		 * sync wakes, always treat the current CPU as idle.
-		 */
+		* Check if this CPU is idle or only has SCHED_IDLE tasks. For
+		* sync wakes, always treat the current CPU as idle.
+		*/
 		if ((sync && cpu == smp_processor_id()) ||
-		    available_idle_cpu(cpu) || sched_idle_cpu(cpu)) {
 			/* Discard any previous non-idle candidate */
+		    idle_cpu(cpu) || sched_idle_cpu(cpu)) {
 			if (!has_idle) {
 				best = curr;
 				cidx ^= 1;
@@ -149,18 +162,18 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync)
 		curr->util = cass_cpu_util(cpu, sync);
 
 		/*
-		 * Add @p's utilization to this CPU if it's not @p's CPU, to
-		 * find what this CPU's relative utilization would look like
-		 * if @p were on it.
-		 */
+		* Add @p's utilization to this CPU if it's not @p's CPU, to
+		* find what this CPU's relative utilization would look like
+		* if @p were on it.
+		*/
 		if (cpu != task_cpu(p))
 			curr->util += p_util;
 
 		/*
-		 * Get the current capacity of this CPU adjusted for thermal
-		 * pressure as well as IRQ and RT-task time.
-		 */
-		curr->cap = capacity_of(cpu);
+		* Get the current capacity of this CPU adjusted for thermal
+		* pressure as well as IRQ and RT-task time.
+		*/
+		curr->cap = cpu_capacity_orig(cpu);
 
 		/* Calculate the relative utilization for this CPU candidate */
 		curr->util = curr->util * SCHED_CAPACITY_SCALE / curr->cap;
@@ -189,12 +202,12 @@ static int cass_select_task_rq_fair(struct task_struct *p, int prev_cpu,
 		return prev_cpu;
 
 	/*
-	 * If there aren't any valid CPUs which are active, then just return the
-	 * first valid CPU since it's possible for certain types of tasks to run
-	 * on inactive CPUs.
-	 */
-	if (unlikely(!cpumask_intersects(p->cpus_ptr, cpu_active_mask)))
-		return cpumask_first(p->cpus_ptr);
+	* If there aren't any valid CPUs which are active, then just return the
+	* first valid CPU since it's possible for certain types of tasks to run
+	* on inactive CPUs.
+	*/
+	if (unlikely(!cpumask_intersects(&p->cpus_allowed, cpu_active_mask)))
+		return cpumask_first(&p->cpus_allowed);
 
 	/* cass_best_cpu() needs the task's utilization, so sync it up */
 	if (!(sd_flag & SD_BALANCE_FORK))
