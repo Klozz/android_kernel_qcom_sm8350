@@ -32,7 +32,7 @@
 #include <linux/freezer.h>
 #include <linux/irq.h>
 #include <linux/list_sort.h>
-#include <linux/sched.h> // sched.h instead of ../sched/sched.h
+#include "../sched/sched.h"
 #include "internals.h"
 
 /* Perform IRQ balancing every POLL_MS milliseconds */
@@ -66,6 +66,7 @@ struct bal_domain {
 
 static LIST_HEAD(bal_irq_list);
 static DEFINE_SPINLOCK(bal_irq_lock);
+static DEFINE_PER_CPU(struct bal_domain, balance_data);
 static DEFINE_PER_CPU(unsigned long, cpu_cap);
 static cpumask_t cpu_exclude_mask __read_mostly;
 
@@ -88,7 +89,7 @@ void sbalance_desc_del(struct irq_desc *desc)
 	struct bal_irq *bi;
 
 	spin_lock(&bal_irq_lock);
-	list_for_each_entry_rcu(bi, &bal_irq_list, node) {
+	list_for_each_entry(bi, &bal_irq_list, node) {
 		if (bi->desc == desc) {
 			list_del_rcu(&bi->node);
 			kfree_rcu(bi, rcu);
@@ -115,7 +116,7 @@ static bool update_irq_data(struct bal_irq *bi, int *cpu)
 
 	/* Find the CPU which currently has this IRQ affined */
 	raw_spin_lock_irq(&desc->lock);
-	*cpu = cpumask_first(desc->irq_data.affinity);
+	*cpu = cpumask_first(desc->irq_common_data.affinity);
 	raw_spin_unlock_irq(&desc->lock);
 	if (*cpu >= nr_cpu_ids)
 		return false;
@@ -146,9 +147,10 @@ static int move_irq_to_cpu(struct bal_irq *bi, int cpu)
 
 	/* Set the affinity if it wasn't changed since we looked at it */
 	raw_spin_lock_irq(&desc->lock);
-	prev_cpu = cpumask_first(desc->irq_data.affinity);
+	prev_cpu = cpumask_first(desc->irq_common_data.affinity);
 	if (prev_cpu == bi->prev_cpu) {
-		ret = irq_set_affinity_locked(&desc->irq_data, cpumask_of(cpu)); // removed false.
+		ret = irq_set_affinity_locked(&desc->irq_data, cpumask_of(cpu),
+					      false);
 	} else {
 		bi->prev_cpu = prev_cpu;
 		ret = -EINVAL;
@@ -167,7 +169,7 @@ static int move_irq_to_cpu(struct bal_irq *bi, int cpu)
 static unsigned int scale_intrs(unsigned int intrs, int cpu)
 {
 	/* Scale the number of interrupts to this CPU's current capacity */
-	return intrs * SCHED_CAPACITY_SCALE / per_cpu(cpu_cap, cpu); // adjust for 5.4.
+	return intrs * SCHED_CAPACITY_SCALE / per_cpu(cpu_cap, cpu);
 }
 
 /* Returns true if IRQ balancing should stop */
@@ -231,7 +233,7 @@ static void balance_irqs(void)
 	 * considered when balancing.
 	 */
 	for_each_cpu(cpu, &cpus)
-		per_cpu(cpu_cap, cpu) = cpu_rq(cpu)->cpu_load.weight; //adjust for 5.4
+		per_cpu(cpu_cap, cpu) = cpu_rq(cpu)->cpu_capacity;
 
 	list_for_each_entry_rcu(bi, &bal_irq_list, node) {
 		if (!update_irq_data(bi, &cpu))
