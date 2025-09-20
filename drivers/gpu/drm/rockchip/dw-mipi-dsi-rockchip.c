@@ -1128,6 +1128,6 @@ struct platform_driver dw_mipi_dsi_rockchip_driver = {
 		 * drvdata in dw_mipi_dsi_rockchip_find_second(). This is not
 		 * safe for asynchronous probe.
 		 */
-		.probe_type = PROBE_FORCE_SYNCHRONOUS,
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 };
