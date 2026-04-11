@@ -249,7 +249,8 @@ static void vmpressure_work_fn(struct work_struct *work)
 	} while ((vmpr = vmpressure_parent(vmpr)));
 }
 
-static void calculate_vmpressure_win(void)
+//static void calculate_vmpressure_win(void)
+static unsigned long calculate_vmpressure_win(void)
 {
 	long x;
  
@@ -268,8 +269,7 @@ static void calculate_vmpressure_win(void)
 	 * cached is high. The sqaure root function is empirically
  	 * found to serve the purpose.
 	 */
-	x = int_sqrt(x);
-	vmpressure_win = x;
+	return int_sqrt(x);
 }
 
 #ifdef CONFIG_MEMCG
