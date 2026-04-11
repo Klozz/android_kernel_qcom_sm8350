@@ -15,6 +15,7 @@
 #include <linux/psi.h>
 #include <linux/sched/mm.h>
 #include <linux/sort.h>
+#include <linux/string.h>
 #include <uapi/linux/sched/types.h>
 
 /* The minimum number of pages to free per reclaim */
@@ -541,7 +542,7 @@ static int simple_lmk_init_set(const char *val, const struct kernel_param *kp)
 			 CONFIG_ANDROID_SIMPLE_LMK_PSI_WINDOW_US);
 
 			mem_pressure_trigger = psi_trigger_create(&psi_system, trigger,
-													  PSI_MEM);
+													  strlen(trigger), PSI_MEM);
 			if (IS_ERR(mem_pressure_trigger)) {
 				pr_err("Failed to create memory PSI trigger \"%s\": %ld\n",
 					   trigger, PTR_ERR(mem_pressure_trigger));
