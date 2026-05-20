@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -154,6 +154,9 @@ typedef enum {
   WLAN_MODULE_SMART_TX,                 /* 0x71 */
   WLAN_MODULE_BRIDGE_PEER,              /* 0x72 */
   WLAN_MODULE_AUX_MAC_MGR,              /* 0x73 */
+  WLAN_MODULE_TCAM,                     /* 0x74 */
+  WLAN_MODULE_P2P_R2,                   /* 0x75 */
+  WLAN_MODULE_SYSSW,                    /* 0x76 */
 
   /* HDL MODULE IDS */
   WLAN_MODULE_PHYLIB_RXDCOCAL,          /* 0x77 */
@@ -198,6 +201,7 @@ typedef enum {
 
   WLAN_MODULE_ID_MAX,
   WLAN_MODULE_ID_INVALID = WLAN_MODULE_ID_MAX,
+  WLAN_MODULE_ID_ALL = 0xffff /* wildcard to indicate all modules */
 } WLAN_MODULE_ID;
 
 
