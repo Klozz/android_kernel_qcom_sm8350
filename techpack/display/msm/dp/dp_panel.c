@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -2295,7 +2295,92 @@ static int dp_panel_set_stream_info(struct dp_panel *dp_panel,
 	return 0;
 }
 
-static int dp_panel_init_panel_info(struct dp_panel *dp_panel)
+static int dp_panel_pwm_register(struct dp_panel *dp_panel)
+{
+	int rc = 0;
+	struct dp_backlight_config *bl = &dp_panel->bl_config;
+	struct platform_device *pdev;
+	struct device *dev;
+	struct dp_panel_private *panel;
+
+	panel = container_of(dp_panel, struct dp_panel_private, dp_panel);
+	pdev = panel->parser->pdev;
+	dev = &pdev->dev;
+
+	bl->pwm_bl = devm_of_pwm_get(dev, dev->of_node, NULL);
+	if (IS_ERR_OR_NULL(bl->pwm_bl)) {
+		rc = PTR_ERR(bl->pwm_bl);
+		DP_ERR("failed to request pwm, rc=%d\n", rc);
+		return rc;
+	}
+
+	return 0;
+}
+
+static void dp_panel_pwm_unregister(struct dp_panel *dp_panel)
+{
+	struct dp_backlight_config *bl = &dp_panel->bl_config;
+	struct platform_device *pdev;
+	struct dp_panel_private *panel;
+
+	panel = container_of(dp_panel, struct dp_panel_private, dp_panel);
+	pdev = panel->parser->pdev;
+
+	if (bl->pwm_bl)
+		devm_pwm_put(&pdev->dev, bl->pwm_bl);
+}
+
+static int dp_panel_set_backlight(struct dp_panel *panel, u32 bl_lvl)
+{
+	int rc = 0;
+	u32 duty = 0;
+	u32 period_ns = 0;
+	struct dp_backlight_config *bl;
+
+	if (!panel) {
+		DP_ERR("Invalid Params\n");
+		return -EINVAL;
+	}
+
+	bl = &panel->bl_config;
+	if (!bl->pwm_bl) {
+		DP_ERR("pwm device not found\n");
+		return -EINVAL;
+	}
+
+	DP_DEBUG("backlight lvl:%d\n", bl_lvl);
+
+	period_ns = bl->pwm_period_usecs * NSEC_PER_USEC;
+	duty = bl_lvl * period_ns;
+	duty /= bl->bl_max_level;
+
+	rc = pwm_config(bl->pwm_bl, duty, period_ns);
+	if (rc) {
+		DP_ERR("failed to change pwm config, rc=\n", rc);
+		goto error;
+	}
+
+	if (bl_lvl == 0 && bl->pwm_enabled) {
+		pwm_disable(bl->pwm_bl);
+		bl->pwm_enabled = false;
+		return 0;
+	}
+
+	if (bl_lvl != 0 && !bl->pwm_enabled) {
+		rc = pwm_enable(bl->pwm_bl);
+		if (rc) {
+			DP_ERR("failed to enable pwm, rc=\n", rc);
+			goto error;
+		}
+
+		bl->pwm_enabled = true;
+	}
+
+error:
+	return rc;
+}
+
+static int dp_panel_init_panel_info(struct dp_panel *dp_panel, bool skip_op)
 {
 	int rc = 0;
 	struct dp_panel_private *panel;
@@ -2306,6 +2391,9 @@ static int dp_panel_init_panel_info(struct dp_panel *dp_panel)
 		rc = -EINVAL;
 		goto end;
 	}
+
+	if (skip_op)
+		goto end;
 
 	panel = container_of(dp_panel, struct dp_panel_private, dp_panel);
 	pinfo = &dp_panel->pinfo;
